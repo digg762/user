@@ -3,7 +3,7 @@ import logging
 import os
 
 from aiogram import Bot, Dispatcher, F, Router
-from aiogram.filters import Command, CommandObject
+from aiogram.filters import Command
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -18,17 +18,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("Не задана переменная окружения BOT_TOKEN")
 
-# Текст, который бот подставляет вместо /go
+# Текст, который будет над ссылкой
 PREPARED_TEXT = "Пользователь хочет купить у вас этот подарок"
 
-# Хорошее пожелание
+# Хорошее пожелание (при нажатии "Продать")
 GOOD_WISH = (
-    "Отправьте подарок в течении 24 часов\n"
-    "Звезды начислятся автоматически на ваш баланс"
+    "Пусть этот день принесёт тебе только радость, улыбки и приятные сюрпризы!\n"
+    "Желаю тебе всего самого светлого, тёплого и хорошего! ✨🎁"
 )
-
-# Ссылка на картинку (замени на свою)
-PHOTO_URL = "https://i.imgur.com/example.jpg"  # ← сюда прямую ссылку на фото
 
 # =======================================================
 
@@ -43,28 +40,31 @@ async def cmd_start(message: Message):
     await message.answer(
         "Привет!\n\n"
         "Как пользоваться:\n"
-        "1. Напиши мне команду:\n"
-        "<code>/go ссылка_на_тг_подарок</code>\n\n"
-        "2. Я пришлю готовое сообщение с кнопками.\n"
-        "3. Перешли это сообщение человеку в личку.\n\n"
-        "Когда он нажмёт кнопку — появится нужное окно.",
+        "1. Просто отправь мне <b>фото</b> подарка\n"
+        "2. В подписи к фото можешь сразу написать ссылку\n"
+        "3. Я пришлю готовое сообщение с кнопками\n"
+        "4. Перешли его человеку\n\n"
+        "Пример подписи к фото:\n"
+        "<code>https://t.me/nft/....</code>",
         parse_mode=ParseMode.HTML,
     )
 
 
-@router.message(Command("go"))
-async def cmd_go(message: Message, command: CommandObject):
-    if not command.args:
-        await message.answer(
-            "Нужно указать ссылку.\n\n"
-            "Пример:\n"
-            "<code>/go https://t.me/nft/....</code>",
-            parse_mode=ParseMode.HTML,
-        )
-        return
+@router.message(F.photo)
+async def on_photo(message: Message):
+    """
+    Пользователь просто кидает фото.
+    Бот берёт это фото, добавляет текст + кнопки и отправляет обратно.
+    """
+    # Берём самое большое фото
+    photo = message.photo[-1]
 
-    link = command.args.strip()
-    caption = f"{PREPARED_TEXT}\n{link}"
+    # Если пользователь написал подпись (ссылку) — используем её
+    link = message.caption.strip() if message.caption else ""
+
+    caption = PREPARED_TEXT
+    if link:
+        caption += f"\n{link}"
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -73,9 +73,9 @@ async def cmd_go(message: Message, command: CommandObject):
         ]
     )
 
-    # Отправляем фото + кнопки
+    # Отправляем то же самое фото + наш текст + кнопки
     await message.answer_photo(
-        photo=PHOTO_URL,
+        photo=photo.file_id,
         caption=caption,
         reply_markup=keyboard
     )
@@ -84,7 +84,7 @@ async def cmd_go(message: Message, command: CommandObject):
 @router.callback_query(F.data == "good")
 async def on_good(callback: CallbackQuery):
     await callback.answer(
-        "Для завершения продажи следуйте инструкциям на экране",
+        "урааа посмотри что я приготовил тебе",
         show_alert=True,
     )
 

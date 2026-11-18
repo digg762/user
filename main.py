@@ -13,21 +13,22 @@ from aiogram.types import (
 from aiogram.enums import ParseMode
 
 # ====================== НАСТРОЙКИ ======================
-# В Render добавь переменную окружения:
-#   BOT_TOKEN = токен твоего бота от @BotFather
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise RuntimeError("Не задана переменная окружения BOT_TOKEN")
 
 # Текст, который бот подставляет вместо /go
-PREPARED_TEXT = "привет как дела"
+PREPARED_TEXT = "Пользователь хочет купить у вас этот подарок"
 
-# Хорошее пожелание (можешь поменять)
+# Хорошее пожелание
 GOOD_WISH = (
-    "Пусть этот день принесёт тебе только радость, улыбки и приятные сюрпризы!\n"
-    "Желаю тебе всего самого светлого, тёплого и хорошего! ✨🎁"
+    "Отправьте подарок в течении 24 часов\n"
+    "Звезды начислятся автоматически на ваш баланс"
 )
+
+# Ссылка на картинку (замени на свою)
+PHOTO_URL = "https://i.imgur.com/example.jpg"  # ← сюда прямую ссылку на фото
 
 # =======================================================
 
@@ -53,9 +54,6 @@ async def cmd_start(message: Message):
 
 @router.message(Command("go"))
 async def cmd_go(message: Message, command: CommandObject):
-    """
-    Использование: /go https://t.me/nft/...
-    """
     if not command.args:
         await message.answer(
             "Нужно указать ссылку.\n\n"
@@ -66,40 +64,39 @@ async def cmd_go(message: Message, command: CommandObject):
         return
 
     link = command.args.strip()
-
-    text = f"{PREPARED_TEXT}\n{link}"
+    caption = f"{PREPARED_TEXT}\n{link}"
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="привет хорошо", callback_data="good")],
-            [InlineKeyboardButton(text="привет плохо", callback_data="bad")],
+            [InlineKeyboardButton(text="Продать", callback_data="good")],
+            [InlineKeyboardButton(text="Отказаться", callback_data="bad")],
         ]
     )
 
-    # Отправляем сообщение, которое потом можно переслать
-    await message.answer(text, reply_markup=keyboard)
+    # Отправляем фото + кнопки
+    await message.answer_photo(
+        photo=PHOTO_URL,
+        caption=caption,
+        reply_markup=keyboard
+    )
 
 
 @router.callback_query(F.data == "good")
 async def on_good(callback: CallbackQuery):
-    # Всплывающее окно (как на твоём скрине)
     await callback.answer(
-        "урааа посмотри что я приготовил тебе",
+        "Для завершения продажи следуйте инструкциям на экране",
         show_alert=True,
     )
 
-    # Пытаемся удалить сообщение с кнопками
     try:
         await callback.message.delete()
     except Exception as e:
         logger.warning(f"Не удалось удалить сообщение: {e}")
-        # Если не получилось удалить — хотя бы убираем кнопки
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
 
-    # Отправляем хорошее пожелание
     try:
         await callback.message.answer(GOOD_WISH)
     except Exception as e:
@@ -108,13 +105,11 @@ async def on_good(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bad")
 async def on_bad(callback: CallbackQuery):
-    # Всплывающее окно
     await callback.answer(
         "увы прости",
         show_alert=True,
     )
 
-    # Удаляем сообщение с кнопками
     try:
         await callback.message.delete()
     except Exception as e:
@@ -123,11 +118,6 @@ async def on_bad(callback: CallbackQuery):
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
-
-    # Здесь бот не может удалить чат между двумя людьми.
-    # Максимум — можем просто ничего больше не писать.
-    # Если очень нужно — можно отправить короткое сообщение:
-    # await callback.message.answer("...")
 
 
 async def main():
